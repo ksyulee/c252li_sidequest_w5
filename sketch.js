@@ -45,57 +45,53 @@ function loadLevel(i) {
   player = new BlobPlayer();
   player.spawnFromLevel(level);
 
-  cam.x = player.x - width / 2;
-  cam.y = 0;
-  cam.clampToWorld(level.w, level.h);
+  cam = new Camera2D(width, height);
+  cam.cx = player.x;
+  cam.cy = player.y;
+  cam.update(player, level); // one update to clamp nicely
 }
 
 function draw() {
   // --- game state ---
   player.update(level);
 
-  // Fall death → respawn
   if (player.y - player.r > level.deathY) {
     loadLevel(levelIndex);
     return;
   }
 
-  // --- view state (data-driven smoothing) ---
-  cam.followSideScrollerX(player.x, level.camLerp);
-  cam.y = 0;
-  cam.clampToWorld(level.w, level.h);
+  // NEW: meditative camera update
+  cam.update(player, level);
+
+  // NEW: symbols update (camera "discovers" them)
+  level.updateSymbols(cam, player);
 
   // --- draw ---
   cam.begin();
   level.drawWorld();
+  level.drawSymbols();         // draw symbols behind or above player (your choice)
   player.draw(level.theme.blob);
   cam.end();
 
   // HUD
   fill(0);
   noStroke();
-  text(level.name + " (Example 5)", 10, 18);
-  text("A/D or ←/→ move • Space/W/↑ jump • Fall = respawn", 10, 36);
-  text("camLerp(JSON): " + level.camLerp + "  world.w: " + level.w, 10, 54);
-  text("cam: " + cam.x + ", " + cam.y, 10, 90);
-  const p0 = level.platforms[0];
-  text(`p0: x=${p0.x} y=${p0.y} w=${p0.w} h=${p0.h}`, 10, 108);
-
-  text(
-    "platforms: " +
-      level.platforms.length +
-      " start: " +
-      level.start.x +
-      "," +
-      level.start.y,
-    10,
-    72,
-  );
+  text(level.name + " (Week 5 — Meditative Camera)", 10, 18);
+  text("A/D or ←/→ move • Space/W/↑ jump • E collect symbol", 10, 36);
+  text("Symbols collected: " + level.collectedCount() + "/" + level.symbols.length, 10, 54);
 }
 
 function keyPressed() {
   if (key === " " || key === "W" || key === "w" || keyCode === UP_ARROW) {
     player.tryJump();
   }
+
+  // Press E to collect (once)
+  if (key === "e" || key === "E") {
+    for (const s of level.symbols) {
+      if (s.tryCollect(cam, player)) break; // collect at most one per press
+    }
+  }
+
   if (key === "r" || key === "R") loadLevel(levelIndex);
 }
